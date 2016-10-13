@@ -1,0 +1,158 @@
+\documentclass{article}
+
+\usepackage{microtype}
+
+\usepackage[utf8]{inputenx}
+\usepackage{newunicodechar}
+\newunicodechar{α}{\ensuremath \alpha}
+\newunicodechar{β}{\ensuremath \beta}
+
+\usepackage{listingsutf8}
+\lstdefinelanguage{julia}{
+  basicstyle=\small\ttfamily,
+  showspaces=false,
+  showstringspaces=false,
+  keywordstyle={\textbf},
+  morekeywords={if,else,elseif,while,for,begin,end,quote,try,catch,return,local,abstract,function,generated,macro,ccall,finally,typealias,break,continue,type,global,module,using,import,export,const,let,bitstype,do,in,baremodule,importall,immutable},
+  escapeinside={~}{~},
+  morecomment=[l]{\#},
+  commentstyle={},
+  morestring=[b]",
+}
+\lstset{language=julia, numbers=left, numberstyle=\tiny, mathescape=true,
+}
+
+\usepackage[lf]{Baskervaldx} % lining figures
+\usepackage[bigdelims,vvarbb]{newtxmath} % math italic letters from Nimbus Roman
+\usepackage[cal=boondoxo]{mathalfa} % mathcal from STIX, unslanted a bit
+
+%XXX REMOVE FOR FINAL SUBMISSION
+\usepackage{todonotes}
+
+\bibliographystyle{siam}
+
+\title{An implementation of the HPC Challenge Kernels in Julia}
+
+\author{%
+    Jiahao Chen
+    \thanks{Computer Science and Artificial Intelligence Laboratory,
+           Massachusetts Institute of Technology,
+           Cambridge, Massachusetts, 02139 ({\tt jiahao@mit.edu})}
+}
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+My abstract.
+\end{abstract}
+
+%XXX REMOVE BEFORE FINAL SUBMISSION
+\listoftodos
+
+\section{Introduction}
+
+\section{The naive serial implementations}
+
+
+
+%\lstinputlisting{../src/kernels-naive.jl}
+
+The serial code makes use of several distinctive features of Julia.
+
+\paragraph{Matrix factorizations}
+Matrix factorizations are types of objects defined in the base library. Even
+though the underlying storage is essentially that of a dense matrix, the type
+serves as a tag to instruct Julia how to perform operations like \lstinline|\|
+on it, knowing that the underlying matrix is no longer an ordinary dense array,
+but instead has the memory layout used by LAPACK that allows the lower and
+upper triangular parts to cohabit the same matrix. Having
+\lstinline|Factorization| objects as distinct from (dense) \lstinline|Matrix|
+objects reduces the risk of accidentially interpreting a factored matrix as an
+ordinary matrix, or vice versa.  Having factorizations as first class objects
+in Julia allows users to write code that reuse factorizations, e.g.\ in
+situations where multiple right hand sides must be solved in succession.
+
+\paragraph{Generic functions and multimethods}
+At the same time, the multimethods (multiple dispatch) semantics of Julia
+allows functions like \lstinline|\| to be overloaded with different methods
+which can be distinguished by the types of their arguments. The same generic
+function can therefore be used to describe solving a system of linear equations
+stored in multiple different formats, be the coefficients specified as an
+ordinary \lstinline|Matrix|, a \lstinline|SparseMatrixCSC|, or an
+\lstinline|LU| or even a \lstinline|QRCompactWY| object. In this way, Julia
+allows users to capture the naturally polymorphic nature of mathematics. Even
+an operation as familiar as multiplication is heavily overloaded, where context
+dictates which precise meaning is meant---the product of two integers, a
+complex scalar-real matrix product, or a matrix-vector product, to name just
+three.
+
+The multimethods of \lstinline|\| allow for an unusual combination of speed and
+flexibility. The code in \lstinline|hpl()| will work for the real, double,
+complex and zomplex matrices familiar to anyone who has worked with BLAS or
+LAPACK, dispatching onto the appropriate LAPACK routines underneath. In
+addition, though, the code will accept matrices with more unusual element
+types, such as high precision floating point numbers \lstinline|BigFloat| and
+\lstinline|Complex{BigFloat}|. The code will even work on exotic, user-defined
+fields that the base library knows nothing about, such as dual numbers,
+quaternions or $p$-adic numbers. Cases that cannot be handled by LAPACK use a
+routine written in pure Julia, which is a textbook implementation of partially
+pivoted LU factorization. You can force the code to use the pure Julia routine
+by calling \lstinline|LinAlg.generic_lufact!|. In spirit it is closer to
+LINPACK than LAPACK, as no attempt is made to exploit locality though tiled
+operations. While \lstinline|generic_lufact!| is significantly slower than the
+tiled operations in LAPACK/BLAS, it will work on any field for which primitive
+operations like addition and multiplication (and their inverses) are defined.
+
+\paragraph{Polymorphism through abstract types and type parameters}
+As can be seen from the code listings, most variables in Julia code do not need
+to be typed explicitly. Instead, Julia's compiler is able to insert the types
+of the arguments at run time and use that information to generate optimized
+code where possible. An exception can be seen in \lstinline|randomupdate!|,
+which is defined by a family of parametrized methods (with parameter \lstinline|T|).
+In this case, knowledge of the element type \lstinline|T| of the array
+\lstinline|A| is needed within the method body to know what type of random
+number to generate. The \lstinline|T<:Integer| restriction means that
+\lstinline|T| can be another integer type, such as \lstinline|BigInt| or
+\lstinline|Int8|, but not other types like \lstinline|Float64| or even
+\lstinline|String|. The polymorphism is not strictly needed for the challenge,
+which only requires \lstinline|T=UInt64|; however, it is practically free to
+define, since unlike C++ expression templates, the compiler generates code only
+for methods that are actually called, rather than for all possible values of
+the type parameter.
+
+A second level of polymorphism is provided by the \lstinline|AbstractVector|
+type annotation, which allows this method definition to work not only on
+ordinary dense 1D arrays (\lstinline|Vector|), but also on other 1D array types
+like distributed arrays (\lstinline|DArray{T,1}|), which is another subtype of
+\lstinline|AbstractVector|. Note that unlike in a compiled language like C++,
+there is no guarantee that the method is correct for all subtypes of
+\lstinline|AbstractVector|---when called with a \lstinline|Range| object, which
+stores only the end points and the step size, the code will throw a run time
+error because an arbitrary element of a \lstinline|Range| can only be read, not
+modified.
+
+\paragraph{Extensive Unicode support}
+Julia allows a wide range of Unicode characters to be used as the names of
+variables and functions. When used judiciously, the extensive support for
+Unicode reduces the cognitive load on programmers transcribing algorithms from
+their mathematical descriptions in the literature, which make heavy use of
+non-Latin letters ($\alpha$, $\aleph$), decorations ($\hat{\omega}$) and
+sub-/superscripts ($\Sigma^\prime_0$), etc. Many of these symbols can be
+transcribed directly into valid Julia code, which simplifies verification of
+implementations against their original descriptions in pseudocode, mathematical
+formulae or prose.
+
+\section{Implementation}
+
+\section{Results}
+
+\section{Conclusions}
+
+\section*{Acknowledgments}
+
+\bibliography{bib}
+
+\end{document}
