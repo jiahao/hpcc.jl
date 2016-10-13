@@ -2,8 +2,8 @@
 #Reference: http://www.hpcchallenge.org/class2specs.pdf
 
 function hpl(A, b)
-    F = lufact(A) #Partial pivoting on by default
-    A \ b
+    F = lufact!(A) #Partial pivoting on by default
+    F \ b
 end
 
 function randomupdate!{T}(A::Vector{T}, nupdate)
@@ -33,18 +33,19 @@ function runhpl(n)
     hpl(rand(1, 1), rand(1)) #Precompile
     A = randn(n, n)
     b = randn(n)
+    A′= copy(A)
 
     #Run
     t = @elapsed x=hpl(A, b)
 
     #Validate
-    r = b - A*x
+    r = b - A′*x
     ϵ = eps()
     r₀= norm(r,Inf)
-    nrmA1 = norm(A, 1)
+    nrmA1 = norm(A′, 1)
     r₁= r₀ / (ϵ*nrmA1*n)
     r₂= r₀ / (ϵ*nrmA1*norm(x,1))
-    r₃= r₀ / (ϵ*norm(A,Inf)*norm(x,Inf)*n)
+    r₃= r₀ / (ϵ*norm(A′,Inf)*norm(x,Inf)*n)
     err = max(r₁, r₂, r₃)
     if err ≥ 16
         warn("Error", err, "exceeds allowed value of 16")
