@@ -16,7 +16,7 @@ end
 
 function streamtriad!(a, b, α, c, ntrial=10)
     m = size(a, 1)
-    for j=1:ntrial, i=1:m
+    for j=1:ntrial, i in eachindex(a)
         a[i] = b[i] + α*c[i]
     end
 end

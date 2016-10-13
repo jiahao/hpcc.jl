@@ -1,6 +1,7 @@
 #simple.jl
 
 include("kernels_naive.jl")
+include("kernels_pure.jl")
 
 ################################################################################
 
