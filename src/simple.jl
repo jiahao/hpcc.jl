@@ -6,6 +6,11 @@ function hpl(A, b)
     F \ b
 end
 
+function hpl2(A, b)
+    F = LinAlg.generic_lufact!(A) #Pure Julia implementation, NO LAPACK OR BLAS calls
+    F \ b
+end
+
 function randomupdate!{T}(A::Vector{T}, nupdate)
     m = size(A, 1)
     for i=1:nupdate
@@ -37,6 +42,31 @@ function runhpl(n)
 
     #Run
     t = @elapsed x=hpl(A, b)
+
+    #Validate
+    r = b - A′*x
+    ϵ = eps()
+    r₀= norm(r,Inf)
+    nrmA1 = norm(A′, 1)
+    r₁= r₀ / (ϵ*nrmA1*n)
+    r₂= r₀ / (ϵ*nrmA1*norm(x,1))
+    r₃= r₀ / (ϵ*norm(A′,Inf)*norm(x,Inf)*n)
+    err = max(r₁, r₂, r₃)
+    if err ≥ 16
+        warn("Error", err, "exceeds allowed value of 16")
+    end
+    return t
+end
+
+function runhpl2(n)
+    #Initialize
+    hpl2(rand(1, 1), rand(1)) #Precompile
+    A = randn(n, n)
+    b = randn(n)
+    A′= copy(A)
+
+    #Run
+    t = @elapsed x=hpl2(A, b)
 
     #Validate
     r = b - A′*x
@@ -89,7 +119,7 @@ function runstreamtriad(m, ntrials=10)
     α = randn()
 
     #Run
-    t = 0.0
+    t = Inf
     for i in 1:ntrials
         t = min(t, @elapsed streamtriad!(a, b, α, c))
     end
@@ -124,46 +154,51 @@ end
 #Run the tests
 
 println("Serial HPL")
+#        1234567890123456789012345678901234567890123456
+println("Problem size (n) | Run time (sec.) | Gigaflops")
 for e in 3:0.2:3.8
     n = round(Int, 10^e)
-    println("Problem size = ", n)
+    @printf("%16d | ", n)
     t = runhpl(n)
-    println("Run time = $t s")
-    println("Gigaflops = ", 1e-9*(2n^3/3 + 3n^2/2)/t)
+    @printf("%15.6f | %15.9f\n", t, 1e-9*(2n^3/3 + 3n^2/2)/t)
 end
 
-println()
-println()
-println()
-println("Serial random update")
+println("\n\n\nSerial HPL v2 - pure Julia kernel")
+#        1234567890123456789012345678901234567890123456
+println("Problem size (n) | Run time (sec.) | Gigaflops")
+for e in 3:0.2:3.4
+    n = round(Int, 10^e)
+    @printf("%16d | ", n)
+    t = runhpl2(n)
+    @printf("%15.6f | %15.9f\n", t, 1e-9*(2n^3/3 + 3n^2/2)/t)
+end
+
+println("\n\n\nSerial random update")
+#        12345678901234567890123456789012345678901234567890123
+println("Problem size (m) | Run time (sec.) | Gigaupdates/sec.")
 for e in 18:24
     m = 2^e
-    println("Problem size = ", m)
+    @printf("%16d | ", m)
     t = runrandomupdate(m)
-    println("Run time = $t s")
-    println("GUPS = ", m*1e-9/t)
-end
-exit()
-println()
-println()
-println()
-println("Serial STREAM triad")
-for e in 6.5:0.5:8.0
-    m = round(Int, 10^e)
-    println("Problem size = ", m)
-    t = runstreamtriad(m)
-    println("Run time = $t s")
-    println("Gigabytes/sec = ", 2.4e-8*10*m/t)
+    @printf("%15.6f | %15.9f\n", t, m*1e-9/t)
 end
 
-println()
-println()
-println()
-println("Serial FFT")
-for e in 6:0.5:8
+println("\n\n\nSerial STREAM triad")
+#        123456789012345678901234567890123456789012345678901
+println("Problem size (m) | Run time (sec.) | Gigabytes/sec.")
+for e in 6.5:0.5:8.0
     m = round(Int, 10^e)
-    println("Problem size = ", m)
+    @printf("%16d | ", m)
+    t = runstreamtriad(m)
+    @printf("%15.6f | %15.9f\n", t, 1e-9*24*10*m/t)
+end
+
+println("\n\n\nSerial FFT")
+#        123456789012345678901234567890123456789012345678901
+println("Problem size (m) | Run time (sec.) | Gigaflops")
+for e in 6:0.5:7
+    m = round(Int, 10^e)
+    @printf("%16d | ", m)
     t = runfft(m)
-    println("Run time = $t s")
-    println("Gigaflops = ", 5e-9*m*log2(m)/t)
+    @printf("%15.6f | %15.9f\n", t, 5e-9*m*log2(m)/t)
 end
