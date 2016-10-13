@@ -1,0 +1,13 @@
+For the report we expect a short description of the implementation, the performance achieved, lines-of-code, and the actual source code used. More specifically the short description may include: 
+
+Explanation of why the implementation should be considered for the award.
+Identify specific benchmarks implemented and run.
+Code size measured with source lines of code (see: http://icl.cs.utk.edu/projectsfiles/hpcc/download/sclc.pl) or equivalent.
+Identify and explain any differences with the official HPC Challenge v1.0 benchmark.
+Description of implementation environment, language, and tools used.
+Identify all relevant libraries used.
+Description of the system the benchmark was run on.
+Description of problem sizes of run.
+Performance relative to reference HPC Challenge benchmark.
+Discussion of the effort and expertise required to implement and run the benchmark.
+References to additional supporting data on the environment used for the implementation.
