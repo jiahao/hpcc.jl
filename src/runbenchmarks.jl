@@ -1,33 +1,6 @@
-#IMPLEMENTATION OF THE FOUR KERNELS
-#Reference: http://www.hpcchallenge.org/class2specs.pdf
+#simple.jl
 
-function hpl(A, b)
-    F = lufact!(A) #Partial pivoting on by default
-    F \ b
-end
-
-function hpl2(A, b)
-    F = LinAlg.generic_lufact!(A) #Pure Julia implementation, NO LAPACK OR BLAS calls
-    F \ b
-end
-
-function randomupdate!{T}(A::Vector{T}, nupdate)
-    m = size(A, 1)
-    for i=1:nupdate
-        r = rand(T)
-        index = r & (m-1) + 1
-        A[index] $= r
-    end
-end
-
-function streamtriad!(a, b, α, c, ntrial=10)
-    m = size(a, 1)
-    for j=1:ntrial, i=1:m
-        a[i] = b[i] + α*c[i]
-    end
-end
-
-FFT(z) = fft!(z)
+include("kernels_naive.jl")
 
 ################################################################################
 
