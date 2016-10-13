@@ -65,10 +65,23 @@ function runstreamtriadp(m, ntrials=10)
     c = drandn(m)
     α = randn()
 
+    @assert a.pids==workers() "Not enough work to parallelize over all cores"
+    @assert a.pids==b.pids==c.pids "Cuts are not aligned"
+
     #Run
     t = Inf
     for i in 1:ntrials
-        t = min(t, @elapsed streamtriad!(a, b, α, c))
+        t0 = @elapsed streamtriad!(a, b, α, c)
+        t = min(t, t0)
+    end
+
+    #Validate
+    a′ = Array(a)
+    d  = zeros(m)
+    streamtriad!(d, Array(b), α, Array(c))
+    err = norm(a′-d, 1)
+    if err > 1e-6
+        warn("Error = $err exceeds threshold")
     end
     return t
 end
