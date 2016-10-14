@@ -36,8 +36,9 @@ function runrandomupdatep(m, nupdate=4m, seed=1)
     #Initialize
     randomupdate!(dzeros(UInt64,1), 1) #Precompile
     srand(seed)
-    T = @DArray [i for i in 1:m]
+    T = @DArray [UInt64(i) for i in 1:m]
 
+    @assert T.pids==workers() "Not enough work to distribute across all cores"
     #Run
     t = @elapsed randomupdate!(T, nupdate)
 

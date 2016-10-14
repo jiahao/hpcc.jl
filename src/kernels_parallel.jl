@@ -18,15 +18,26 @@ function procof{T}(A::DArray{T,1}, idx::Integer)
     end
 end
 
-updatearr(A, i, r) = (localpart(A)[i] $= r)
+function updatearray!(A, w)
+    Al = localpart(A)
+    for (i, r) in w
+	Al[i] $= r
+    end
+end
 
 function randomupdate!{T<:Integer}(A::DArray{T,1}, nupdate)
     m = size(A, 1)
+    work = Dict()
     for i=1:nupdate
         r = rand(T)
         index = r & (m-1) + 1
         p, i = procof(A, index)
-        remotecall_wait(updatearr, p, A, i, r)
+	work[p] = push!(get(work, p, Tuple{UInt64,UInt64}[]), (i, r))
+    end
+    @sync begin
+	for (p, w) in work
+            remotecall(updatearray!, p, A, w)
+	end
     end
 end
 
