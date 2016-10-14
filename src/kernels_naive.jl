@@ -14,9 +14,9 @@ function randomupdate!{T<:Integer}(A::AbstractVector{T}, nupdate)
     end
 end
 
-function streamtriad!(a, b, α, c, ntrial=10)
+function streamtriad!(a, b, α, c)
     m = size(a, 1)
-    for j=1:ntrial, i in eachindex(a)
+    for i in eachindex(a)
         a[i] = b[i] + α*c[i]
     end
 end

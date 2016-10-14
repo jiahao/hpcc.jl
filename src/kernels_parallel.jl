@@ -42,9 +42,12 @@ function randomupdate!{T<:Integer}(A::DArray{T,1}, nupdate)
 end
 
 function streamtriad!{T}(a::DArray{T,1}, b::DArray{T,1}, α::T, c::DArray{T,1}, ntrial=10)
+    @assert a.cuts==b.cuts==c.cuts "Cuts are not aligned"
     m = size(a, 1)
-    for j=1:ntrial, i in localindexes(a)
-        a[i] = b[i] + α*c[i]
+    for j=1:ntrial
+        @sync for p in a.pids
+            @async remotecall_fetch(()->(streamtriad!(localpart(a), localpart(b), α, localpart(c))), p)
+        end
     end
 end
 
