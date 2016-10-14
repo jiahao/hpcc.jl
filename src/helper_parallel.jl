@@ -32,20 +32,21 @@ function runhplp(n)
     return t
 end
 
-function runrandomupdatep(m, nupdate=4m, seed=1)
+function runrandomupdatep(m, nupdate=4m)
     #Initialize
-    randomupdate!(dzeros(UInt64,1), 1) #Precompile
-    srand(seed)
+    randomupdate!(dzeros(UInt64,1), UInt64[1]) #Precompile
+
     T = @DArray [UInt64(i) for i in 1:m]
-
     @assert T.pids==workers() "Not enough work to distribute across all cores"
+    rnd = rand(UInt64, nupdate*m)
+    
     #Run
-    t = @elapsed randomupdate!(T, nupdate)
-
+    #t = @elapsed randomupdate!(T, rnd)
+    @profile randomupdate!(T, rnd)
+    Profile.print(C=true)
     #Validate
-    srand(seed)
     T′ = Array(T)
-    randomupdate!(T′, nupdate)
+    randomupdate!(T′, rnd)
 
     err = 0
     for i = 1:m

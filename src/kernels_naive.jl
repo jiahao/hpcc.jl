@@ -5,10 +5,9 @@ function hpl(A, b)
     F \ b
 end
 
-function randomupdate!{T<:Integer}(A::AbstractVector{T}, nupdate)
+function randomupdate!{T<:Integer}(A::AbstractVector{T}, rnd::AbstractVector{T})
     m = size(A, 1)
-    for i=1:nupdate
-        r = rand(T)
+    for r in rnd
         index = r & (m-1) + 1
         A[index] $= r
     end

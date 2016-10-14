@@ -18,26 +18,25 @@ function procof{T}(A::DArray{T,1}, idx::Integer)
     end
 end
 
-function updatearray!(A, w)
+function updatearray!(A, rnd)
+    m = size(A, 1)
     Al = localpart(A)
-    for (i, r) in w
-	Al[i] $= r
+    myp= myid()
+
+    for r in rnd
+        index = r & (m-1) + 1
+        p, i = procof(A, index)
+        if myp == p
+            Al[i] $= r
+        end
     end
 end
 
-function randomupdate!{T<:Integer}(A::DArray{T,1}, nupdate)
-    m = size(A, 1)
-    work = Dict()
-    for i=1:nupdate
-        r = rand(T)
-        index = r & (m-1) + 1
-        p, i = procof(A, index)
-	work[p] = push!(get(work, p, Tuple{UInt64,UInt64}[]), (i, r))
-    end
+function randomupdate!{T<:Integer}(A::DArray{T,1}, rnd::Vector{T})
     @sync begin
-	for (p, w) in work
-            remotecall(updatearray!, p, A, w)
-	end
+        for p in A.pids
+            remotecall(updatearray!, p, A, rnd)
+        end
     end
 end
 
