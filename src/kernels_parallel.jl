@@ -41,13 +41,14 @@ function randomupdate!{T<:Integer}(A::DArray{T,1}, nupdate)
     end
 end
 
-function streamtriad!{T}(a::DArray{T,1}, b::DArray{T,1}, α::T, c::DArray{T,1}, ntrial=10)
+function streamtriad!{T}(a::DArray{T,1}, b::DArray{T,1}, α::T, c::DArray{T,1})
     @assert a.cuts==b.cuts==c.cuts "Cuts are not aligned"
     m = size(a, 1)
-    for j=1:ntrial
-        @sync for p in a.pids
-            @async remotecall_fetch(()->(streamtriad!(localpart(a), localpart(b), α, localpart(c))), p)
-        end
+    @sync for p in a.pids
+        #Slightly more efficient that the alternative
+        #@async remotecall_fetch(()->(streamtriad!(localpart(a), localpart(b), α, localpart(c))))
+        # Ref: https://github.com/JuliaLang/julia/blob/4ba21aa57f57b9e42eeba5886d9dec772281e9f2/base/multi.jl#L100-L126
+        @async remotecall_fetch((a′, b′, α′, c′)->(streamtriad!(localpart(a′), localpart(b′), α′, localpart(c′))), p, a, b, α, c)
     end
 end
 

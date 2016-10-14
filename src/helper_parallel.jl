@@ -58,7 +58,7 @@ function runrandomupdatep(m, nupdate=4m, seed=1)
     return t
 end
 
-function runstreamtriadp(m, ntrials=10)
+function runstreamtriadp(m, ntrials=10, validate=true)
     #Initialize
     streamtriad!(distribute([0.0]), distribute([1.0]), 2.0, distribute([3.0]))
     a = dzeros(m)
@@ -77,12 +77,18 @@ function runstreamtriadp(m, ntrials=10)
     end
 
     #Validate
-    a′ = Array(a)
-    d  = zeros(m)
-    streamtriad!(d, Array(b), α, Array(c))
-    err = norm(a′-d, 1)
-    if err > 1e-6
-        warn("Error = $err exceeds threshold")
+    if validate
+        a′ = Array(a)
+        d  = zeros(m)
+        streamtriad!(d, Array(b), α, Array(c))
+        
+        err = 0.0
+        for i in 1:m
+            err += abs(d[i]-a′[i])
+        end
+        if err > 1e-6
+            warn("Error = $err exceeds threshold")
+        end
     end
     return t
 end
