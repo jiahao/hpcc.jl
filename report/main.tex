@@ -147,6 +147,50 @@ formulae or prose.
 
 \section{Implementation}
 
+\subsection{Streaming triad}
+
+\paragraph{The method signature requires distributed arrays}
+The method signature here requires the inputs \lstinline|a|, \lstinline|b| and
+\lstinline|c| to all be distributed arrays (\lstinline|DArray|s). The
+\lstinline|{T}| parameter also constrains the method to be defined only for
+inputs of three distributed arrays with the same element type, which is an
+example of \textit{diagonal dispatch} in Julia.
+
+\paragraph{Primitive synchronization constructs: tasks, futures and remote
+procedure calls}
+Julia supports distributed, multiprocess master--slave parallelism
+natively.\footnote{Julia also provides further experimental support for threads
+and shared memory arrays. More traditional parallelism using MPI calls is also
+available through wrapper packages like \lstinline|MPI.jl|.}
+The combination of remote procedure calls and native \lstinline|Task|
+(coroutine) support for asynchronous computing provides simple yet effective
+tools for expressing parallel computing.
+
+The most primitive concurrency construct in Julia is \lstinline|remotecall|,
+which implements a remote procedure call that returns a future that can be
+polled. \lstinline|remotecall_fetch| is a variant of the basic
+\lstinline|remotecall| that immediately attempts to fetch the future produced
+by the remote procedure call. The \lstinline|@async| macro wraps the
+\lstinline|remotecall_fetch| in a \lstinline|Task|, a coroutine that can be
+scheduled on the local process (in this case, master). Finally, the
+\lstinline|@sync| macro implements a synchronization barrier at the end of the
+\lstinline|for| loop, requring every \lstinline|Task| in the local queue to be
+completed before proceeding.
+
+The \lstinline|DistributedArrays.jl| package provides a pure Julia
+implementation of distributed arrays (\lstinline|DArray|s) built on top of
+Julia's native multiprocess model. 
+
+\paragraph{Function closures and local parts of distributed arrays}
+A somewhat subtle aspect of the implementation is in passing an anonymous
+function to \lstinline|remotecall_fetch|. This anonymous function creates a
+closure that effectively delays evaluation of \lstinline|localpart| from being
+evaluated on the master process, to being evaluated on the worker process.
+This implementation simply calls the serial method of \lstinline|streamtriad!|,
+providing a nice demonstration of code reuse between serial and parallel code
+for work that is embarrassingly parallel and requires no data from other
+processes.
+
 \section{Results}
 
 \section{Conclusions}
