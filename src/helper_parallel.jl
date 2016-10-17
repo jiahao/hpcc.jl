@@ -39,11 +39,11 @@ function runrandomupdatep(m, nupdate=4m)
     T = @DArray [UInt64(i) for i in 1:m]
     @assert T.pids==workers() "Not enough work to distribute across all cores"
     rnd = rand(UInt64, nupdate*m)
-    
+
     #Run
-    #t = @elapsed randomupdate!(T, rnd)
-    @profile randomupdate!(T, rnd)
-    Profile.print(C=true)
+    t = @elapsed randomupdate!(T, rnd)
+    #@profile randomupdate!(T, rnd)
+    #Profile.print(C=true)
     #Validate
     T′ = Array(T)
     randomupdate!(T′, rnd)

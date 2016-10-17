@@ -27,6 +27,11 @@ for e in 10:12#18:24
     @printf("%5d | ", nworkers())
     m = 2^e
     @printf("%16d | ", m)
+
+    #Trigger compilation on every machine
+    z = [@spawnat p runrandomupdatep(2^2) for p in ps]
+    [fetch(w) for w in z]
+
     t = runrandomupdatep(m)
     @printf("%15.6f | %15.9f\n", t, m*1e-9/t)
 end
