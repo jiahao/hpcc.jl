@@ -42,15 +42,16 @@ for e in 6.5:0.5:8.0
     @printf("%15.6f | %15.9f\n", t, 1e-9*24*10*m/t)
 end
 
-println("\n\n\nParallel FFT")
-#        123456789012345678901234567890123456789012345678901
-println("Cores | Problem size (m) | Run time (sec.) | Gigaflops")
-for e in 6:0.5:7
-    @printf("%5d | ", nworkers())
-    m = round(Int, 10^e)
-    @printf("%16d | ", m)
-    t = runfftp(m)
-    @printf("%15.6f | %15.9f\n", t, 5e-9*m*log2(m)/t)
-end
+#Not implemented
+#println("\n\n\nParallel FFT")
+##        123456789012345678901234567890123456789012345678901
+#println("Cores | Problem size (m) | Run time (sec.) | Gigaflops")
+#for e in 6:0.5:7
+#    @printf("%5d | ", nworkers())
+#    m = round(Int, 10^e)
+#    @printf("%16d | ", m)
+#    t = runfftp(m)
+#    @printf("%15.6f | %15.9f\n", t, 5e-9*m*log2(m)/t)
+#end
 
 end #addprocs

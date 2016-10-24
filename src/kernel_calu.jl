@@ -37,7 +37,7 @@ done(A::RowBlockedMatrix, iblock) = iblock == 1+ceil(Int, A.m/A.k)
 #Tall and skinny LU
 #k - row block size
 #b - number of pivot rows
-function tslu(A, k, b)
+function tslu!(A, piv, k, b)
     #Step 1: Find set of good pivot rows
     #Serial LU on each block row
     lus = []
@@ -64,12 +64,19 @@ function tslu(A, k, b)
     A = A[F[:p], :] #Permute everything - very much overkill
 
     #Step 3: Unpivoted LU on panel
-    lufact!(view(A, :, 1:b), Val{false})
+    F = if b ≥ size(A, 2)
+        lufact!(A, Val{false})
+    else
+        lufact!(view(A, :, 1:b), Val{false})
+    end
 end
 
-#A quick test
-#let A=reshape(1.0:9.0, 3, 3)
-#    tslu(A, 1, 1)
-#    display(lu(A))
-#    println(dump(lufact(A)))
-#end
+function calu!(A, k=16, b=16)
+    m, n = size(A)
+    piv = collect(1:m)
+    for i = 1:ceil(Int, n/k)
+        tslu!(view(A, (1+(i-1)*k):m, (1+(i-1)*k):n), piv, k, b)
+    end
+    LinAlg.LU(A, piv, 0)
+end
+
