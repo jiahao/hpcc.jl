@@ -7,15 +7,15 @@ include("kernels_parallel.jl")
 
 #Helper routines that initialize, execute, time, and validate the kernels
 
-function runhplp(n)
+function runhplp(n, k, l)
     #Initialize
-    hpl(distribute(rand(1, 1)), rand(1)) #Precompile
+    hpl(distribute(rand(1, 1)), rand(1), 1, 1) #Precompile
     A = drandn(n, n)
     b = randn(n)
     A′= Array(A)
 
     #Run
-    t = @elapsed x=hpl(A, b)
+    t = @elapsed x=hpl(A, b, k, l)
 
     #Validate
     r = b - A′*x
@@ -81,7 +81,7 @@ function runstreamtriadp(m, ntrials=10, validate=true)
         a′ = Array(a)
         d  = zeros(m)
         streamtriad!(d, Array(b), α, Array(c))
-        
+
         err = 0.0
         for i in 1:m
             err += abs(d[i]-a′[i])

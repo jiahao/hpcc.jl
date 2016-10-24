@@ -2,6 +2,27 @@
 
 include("helper_parallel.jl")
 
+println("Parallel HPL: Tuning step on one kernel")
+#        1234567890123456789012345678901234567890123456
+println("    k | Problem size (n) | Run time (sec.) | Gigaflops")
+
+ks = collect(128*(1:5))
+topt = Inf
+kopt = 0
+for k in ks
+    @printf("%5d | ", k)
+    n = 1000
+    @printf("%16d | ", n)
+    t = runhplp(n, k, k)
+    if t < topt
+        topt = t
+        kopt = k
+    end
+    @printf("%15.6f | %15.9f\n", t, 1e-9*(2n^3/3 + 3n^2/2)/t)
+end
+
+info("Setting block size to k = $kopt for HPL")
+
 for np in 1:Sys.CPU_CORES
 ps = addprocs(1)
 
@@ -16,7 +37,7 @@ for e in 3:0.2:3.8
     @printf("%5d | ", nworkers())
     n = round(Int, 10^e)
     @printf("%16d | ", n)
-    t = runhplp(n)
+    t = runhplp(n, kopt, kopt)
     @printf("%15.6f | %15.9f\n", t, 1e-9*(2n^3/3 + 3n^2/2)/t)
 end
 

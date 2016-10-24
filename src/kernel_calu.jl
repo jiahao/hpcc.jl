@@ -71,7 +71,7 @@ function tslu!(A, piv, k, b)
     end
 end
 
-function calu!(A, k=16, b=16)
+function calu!(A, k=64, b=64)
     m, n = size(A)
     piv = collect(1:m)
     for i = 1:ceil(Int, n/k)
