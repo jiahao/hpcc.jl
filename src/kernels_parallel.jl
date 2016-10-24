@@ -1,7 +1,9 @@
 #kernels_parallel.jl
 
+include("kernel_calu.jl")
+
 function hpl{T}(A::DArray{T,2}, b)
-    F = lufact!(Array(A)) #Partial pivoting on by default
+    F = calu!(Array(A))
     F \ b
 end
 
