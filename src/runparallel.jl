@@ -23,8 +23,8 @@ end
 
 info("Setting block size to k = $kopt for HPL")
 
-for np in 1:Sys.CPU_CORES
-ps = addprocs(1)
+for np in [1,2,4,8,16,32,64]#1:64#Sys.CPU_CORES
+    ps = addprocs(min(np-nworkers(), 1))
 
 #Broadcast function definitions to all workers
 z = [@spawnat p include("helper_parallel.jl") for p in ps]
