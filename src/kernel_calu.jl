@@ -1,6 +1,7 @@
 #Communication avoiding LU
 
 import Base: start, next, done, size, getindex
+import DistributedArrays: DArray
 
 #              |
 #   A(ma x na) | B(ma x nb)
@@ -72,7 +73,7 @@ function tslu!(A, piv, k, b)
     for l in lus
         if isa(l,RemoteException)
             showerror(STDERR, l)
-            exit()
+            error()
         end
     end
     info("Time $(round(time() - t, 3)): Step 1: collect done")
@@ -109,8 +110,6 @@ function tslu!(A, piv, k, b)
     end
     info("Time $(round(time() - t, 3)): Step 3: LU done")
 end
-
-
 
 function pidmap{T}(A::SubArray{T,2,DArray{T,2,Matrix{T}}})
     pids = Dict()
@@ -172,104 +171,103 @@ function Base.lufact!{T,piv}(
     end
 end
 
-
-
 function Base.A_ldiv_B!{T}(
         F::LinAlg.LU{T, DArray{T, 2, Array{T,2}}},
         b::AbstractVector{T}
     )
 
-    UpperTriangular(F.factors) \ (
-      LinAlg.UnitLowerTriangular(F.factors) \ (
-        b[LinAlg.ipiv2perm(F.ipiv, length(b))]
-    ))
+    Ff = Array(F.factors)
+    U = UpperTriangular(Ff)
+    L = LinAlg.UnitLowerTriangular(Ff)
+    bp = b[LinAlg.ipiv2perm(F.ipiv, length(b))]
+    x = L \ bp
+    return U \ x
 end
 
+#Intesection of index ranges
+function Base.intersect(A::Tuple{UnitRange{Int64},UnitRange{Int64}},
+                        B::Tuple{UnitRange{Int64},UnitRange{Int64}})
+    a1, a2 = A
+    b1, b2 = B
+    return (a1∩b1, a2∩b2)
+end
 
-
-function DistributedArrays.localpart{T}(A::SubArray{T,N,DArray{T,2,Matrix{T}}})
-    pids = pidmap(A)
-    for (p, i) in pids
+function DistributedArrays.localpart{T,N}(A::SubArray{T,N,DArray{T,2,Matrix{T}}})
+    subindexes = A.indexes
+    local globallocalindex, globalsubindex
+    for (p, localindexes) in zip(A.parent.pids, A.parent.indexes)
         if p == myid()
+            #Compute intersection of indexes in global address space
+            globallocalindex = localindexes
+            globalsubindex = (localindexes ∩ subindexes)
+            break
         end
     end
-    error("Not implemented")
+
+    #Convert local index from global address space to process-local address space
+    localindex1 = globalsubindex[1] - globallocalindex[1].start + 1
+    localindex2 = globalsubindex[2] - globallocalindex[2].start + 1
+    return view(localpart(A.parent), localindex1, localindex2)
 end
 
-
+#Swap rows of a matrix in place
+function swaprows!(A::AbstractMatrix, r1, r2)
+    nc = size(A, 2)
+    for i=1:nc
+        A[r1, i], A[r2, i] = A[r2,i], A[r1,i]
+    end
+end
 
 #Swap rows of a DArray in place
 # e.g. A = drandn(4000, 4000)
 #      swaprows!(A, [(1,2), (1000,1001)])
 # swaps the first two rows of A in place, and also rows 1000 and 1001
-function swaprows!{T}(A::SubArray{T,2,DArray{T,2,Matrix{T}}}, swaplist)
-    @sync for (r1, r2) in swaplist
-        pidmap1 = pidmap(view(A, r1:r1, :))
-        pidmap2 = pidmap(view(A, r2:r2, :))
+function swaprows!{T}(A::SubArray{T,2,DArray{T,2,Matrix{T}}}, r1, r2)
+    pidmap1 = pidmap(view(A, r1:r1, :))
+    pidmap2 = pidmap(view(A, r2:r2, :))
 
-        for (p1, i1) in pidmap1
-            #Need to look up which parts in pidmap2 align
-            info("On proc $p1, chunk $i1")
+    for (i,((p1, (gr1, gc1, lr1, lc1, sr1, sc1)),
+         (p2, (gr2, gc2, lr2, lc2, sr2, sc2)))) in enumerate(zip(pidmap1, pidmap2))
 
-            pidmap2 = pidmap(view(A, r2:r2, i1[2]))
-            @assert length(pidmap2)==1 "Distribution not supported"
+        #Need to look up which parts in pidmap2 align
+        # info("FROM proc $p1, chunk $gr1,$gc1 ($lr1, $lc1) $sr1, $sc1")
+        # info("TO   proc $p2, chunk $gr2,$gc2 ($lr2, $lc2) $sr2, $sc2")
+            if p1 == p2 #Do all the work locally
+                # info("Local work")
+                @assert lc2 == lc2
+                @sync @spawnat p1 swaprows!(localpart(A), sr1, sr2)
+            else #copy from remote, swap, send
+                # info("Local work $p2 -> $p1")
+                @sync @spawnat p1 begin
+                     lA = localpart(A)
+                     B = Array(view(A, sr1, sc1))
 
-            for (p2, i2) in pidmap2
-                info("MAP TO proc $p2, chunk $i2")
-                if p1 == p2 #Do all the work locally
-                     @spawnat p1 begin
-                         lA = localpart(A)
-                         info(zip(i1[3], i2[3]))
-                         info(zip(i1[4], i2[4]))
-                         info(size(lA))
-                         info(typeof(A))
-                         info(typeof(lA))
-                         for (r1, r2) in zip(i1[3], i2[3]), (c1, c2) in zip(i1[4], i2[4])
-                             lA[r1, c1], lA[r2, c2] = lA[r2, c2], lA[r1, c1]
-                         end
+                     for (i1, i2) in enumerate(sr1), j in sr2
+                         B[i1, j], lA[i2, j] = lA[i2, j], B[i1, j]
                      end
-                else #copy from remote, swap, send
-                    @spawnat p1 begin
-                         lA = localpart(A)
-info("$p2 -> $p1 -> $p2")
-                         info(i1)
-                         info(i2)
-                         info(size(lA))
-                         B = Array(view(A,i2[1], i2[2]))
 
-                         for (i1, i2) in enumerate(i1[3]), j in i1[4]
-                             B[i1, j], lA[i2, j] = lA[i2, j], B[i1, j]
-                         end
-
-                         @spawnat p2 begin
-                             localpart(A)[i2[3], i2[4]] = B
-                         end
-                    end
+                     @spawnat p2 localpart(A)[sr2, sc2] = B
                 end
-            end
         end
     end
+    #info("swaprows! done")
 end
-
-
 
 function permuterows!{T}(A::SubArray{T,2,DArray{T,2,Matrix{T}}}, perm)
-    info("permuterows! with permutation $perm")
+    # info("permuterows! with permutation $perm")
     for (a, b) in enumerate(perm)
         if a!=b
-            swaprows!(A, [(a, b)])
+            swaprows!(A, a, b)
         end
     end
 end
-
 
 function calu!(A, k=64, b=64)
     m, n = size(A)
     piv = collect(1:m)
     for i = 1:ceil(Int, n/k)
-        info("calu!: tslu! on [$((1+(i-1)*k):m), $((1+(i-1)*k):n)]")
+        #info("calu!: tslu! on [$((1+(i-1)*k):m), $((1+(i-1)*k):n)]")
         tslu!(view(A, (1+(i-1)*k):m, (1+(i-1)*k):n), piv, k, b)
     end
     LinAlg.LU(A, piv, 0)
 end
-
