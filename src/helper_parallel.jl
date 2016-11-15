@@ -26,9 +26,9 @@ function runhplp(n, k, l)
     r₂= r₀ / (ϵ*nrmA1*norm(x,1))
     r₃= r₀ / (ϵ*norm(A′,Inf)*norm(x,Inf)*n)
     err = max(r₁, r₂, r₃)
-    if err ≥ 16
-        warn("Error", err, "exceeds allowed value of 16")
-    end
+    # if err ≥ 16
+    #     warn("Error $err exceeds allowed value of 16")
+    # end
     return t
 end
 

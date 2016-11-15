@@ -62,13 +62,13 @@ end
 function tslu!(A, piv, k, b)
     #Step 1: Find set of good pivot rows
     #Serial LU on each block row
-    t = time()
-    info("Time $(round(time() - t, 3)): Step 1: broadcast")
+    #t = time()
+    #info("Time $(round(time() - t, 3)): Step 1: broadcast")
     lus = []
     for blockrow in blockrows(A, k)
         push!(lus, @spawnat whoowns(blockrow) lufact(Array(blockrow)))
     end
-    info("Time $(round(time() - t, 3)): Step 1: collect")
+    #info("Time $(round(time() - t, 3)): Step 1: collect")
     lus = map(fetch, lus)
     for l in lus
         if isa(l,RemoteException)
@@ -76,9 +76,9 @@ function tslu!(A, piv, k, b)
             error()
         end
     end
-    info("Time $(round(time() - t, 3)): Step 1: collect done")
+    #info("Time $(round(time() - t, 3)): Step 1: collect done")
     while length(lus) > 1
-        info("Time $(round(time() - t, 3)): Step 1: recursion with $(length(lus)) work to do")
+        #info("Time $(round(time() - t, 3)): Step 1: recursion with $(length(lus)) work to do")
         newlus = []
         nlu = length(lus)
         npairs, isodd = divrem(nlu, 2)
@@ -93,22 +93,22 @@ function tslu!(A, piv, k, b)
         end
         lus = newlus
     end
-    info("Time $(round(time() - t, 3)): Step 1: recursion done")
+    #info("Time $(round(time() - t, 3)): Step 1: recursion done")
 
     #Step 2: Permute pivot rows into first b rows of the panel
-    info("Time $(round(time() - t, 3)): Step 2: pivot")
+    #info("Time $(round(time() - t, 3)): Step 2: pivot")
     perm = view(LinAlg.ipiv2perm(lus[1][:p], size(A, 2)), 1:min(b, size(A, 2)))
     permuterows!(A, perm)
-    info("Time $(round(time() - t, 3)): Step 2: pivot done")
+    #info("Time $(round(time() - t, 3)): Step 2: pivot done")
 
     #Step 3: Unpivoted LU on panel
-    info("Time $(round(time() - t, 3)): Step 3: LU on panel")
+    #info("Time $(round(time() - t, 3)): Step 3: LU on panel")
     F = if b ≥ size(A, 2)
         lufact!(A, Val{false})
     else
         lufact!(view(A, :, 1:b), Val{false})
     end
-    info("Time $(round(time() - t, 3)): Step 3: LU done")
+    #info("Time $(round(time() - t, 3)): Step 3: LU done")
 end
 
 function pidmap{T}(A::SubArray{T,2,DArray{T,2,Matrix{T}}})
