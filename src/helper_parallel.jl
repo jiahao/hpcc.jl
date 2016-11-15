@@ -10,28 +10,29 @@ include("kernels_parallel.jl")
 function runhplp(n, k, l)
     #Initialize
     hpl(distribute(rand(1, 1)), rand(1), 1, 1) #Precompile
-    A = drandn(n, n)
+    #A = drandn(n, n, workers(), [nworkers(), 1])
+    A = distribute(randn(n, n), procs=workers(), dist=[nworkers(), 1])
     b = randn(n)
     A′= Array(A)
 
     #Run
-    success = false
-    local t
-    while !success
-        try
-            t = @elapsed x=hpl(A, b, k, l)
-            success = true
-        end
-    end
+    #success = false
+    #local t, x
+    #while !success
+    #    try
+    #        success = true
+    #    end
+    #end
+    t = @elapsed try x=hpl(A, b, k, l) end
     #Validate
-    r = b - A′*x
-    ϵ = eps()
-    r₀= norm(r,Inf)
-    nrmA1 = norm(A′, 1)
-    r₁= r₀ / (ϵ*nrmA1*n)
-    r₂= r₀ / (ϵ*nrmA1*norm(x,1))
-    r₃= r₀ / (ϵ*norm(A′,Inf)*norm(x,Inf)*n)
-    err = max(r₁, r₂, r₃)
+    #r = b - A′*x
+    #ϵ = eps()
+    #r₀= norm(r,Inf)
+    #nrmA1 = norm(A′, 1)
+    #r₁= r₀ / (ϵ*nrmA1*n)
+    #r₂= r₀ / (ϵ*nrmA1*norm(x,1))
+    #r₃= r₀ / (ϵ*norm(A′,Inf)*norm(x,Inf)*n)
+    #err = max(r₁, r₂, r₃)
     # if err ≥ 16
     #     warn("Error $err exceeds allowed value of 16")
     # end

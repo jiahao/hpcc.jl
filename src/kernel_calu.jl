@@ -62,53 +62,62 @@ end
 function tslu!(A, piv, k, b)
     #Step 1: Find set of good pivot rows
     #Serial LU on each block row
-    #t = time()
-    #info("Time $(round(time() - t, 3)): Step 1: broadcast")
+    t = time()
+    #DEBUG info("Time $(round(time() - t, 3)): Step 1: broadcast")
     lus = []
     for blockrow in blockrows(A, k)
-        push!(lus, @spawnat whoowns(blockrow) lufact(Array(blockrow)))
+        push!(lus, @spawnat whoowns(blockrow) lufact!(Array(blockrow)))
     end
-    #info("Time $(round(time() - t, 3)): Step 1: collect")
-    lus = map(fetch, lus)
+    #DEBUG info("Time $(round(time() - t, 3)): Step 1: collect")
+    #lus = map(fetch, lus)
+    #map(wait, lus) #Wait but don't copy data back to master
     for l in lus
         if isa(l,RemoteException)
             showerror(STDERR, l)
             error()
         end
     end
-    #info("Time $(round(time() - t, 3)): Step 1: collect done")
+    #DEBUG info("Time $(round(time() - t, 3)): Step 1: collect done")
     while length(lus) > 1
-        #info("Time $(round(time() - t, 3)): Step 1: recursion with $(length(lus)) work to do")
+        #DEBUG info("Time $(round(time() - t, 3)): Step 1: recursion with $(length(lus)) work to do")
         newlus = []
         nlu = length(lus)
         npairs, isodd = divrem(nlu, 2)
         for ipair in 1:npairs
-            Upair = [lus[2ipair-1][:U]; lus[2ipair][:U]]
+            w = @spawnat lus[2ipair-1].where begin
+                Upair = [fetch(lus[2ipair-1])[:U]; fetch(lus[2ipair])[:U]]
+                lufact!(Upair)
+            end
+            if isa(w,RemoteException)
+                showerror(STDERR, w)
+                error()
+            end
+            push!(newlus, w)
             #push!(newlus, @spawnat(@show(whoowns(blockrow)), lufact(blockrow)))
-            push!(newlus, lufact(Upair))
         end
         if isodd==1
             #push!(newlus, @spawnat(@show(whoowns(blockrow)), lufact(blockrow)))
             push!(newlus, lus[end])
         end
+        #DEBUG info("$(length(lus)) -> $(length(newlus))")
         lus = newlus
     end
-    #info("Time $(round(time() - t, 3)): Step 1: recursion done")
+    #DEBUG info("Time $(round(time() - t, 3)): Step 1: recursion done")
 
     #Step 2: Permute pivot rows into first b rows of the panel
-    #info("Time $(round(time() - t, 3)): Step 2: pivot")
-    perm = view(LinAlg.ipiv2perm(lus[1][:p], size(A, 2)), 1:min(b, size(A, 2)))
+    #DEBUG info("Time $(round(time() - t, 3)): Step 2: pivot")
+    perm = view(LinAlg.ipiv2perm(fetch(lus[1])[:p], size(A, 2)), 1:min(b, size(A, 2)))
     permuterows!(A, perm)
-    #info("Time $(round(time() - t, 3)): Step 2: pivot done")
+    #DEBUG info("Time $(round(time() - t, 3)): Step 2: pivot done")
 
     #Step 3: Unpivoted LU on panel
-    #info("Time $(round(time() - t, 3)): Step 3: LU on panel")
+    #DEBUG info("Time $(round(time() - t, 3)): Step 3: LU on panel")
     F = if b ≥ size(A, 2)
         lufact!(A, Val{false})
     else
         lufact!(view(A, :, 1:b), Val{false})
     end
-    #info("Time $(round(time() - t, 3)): Step 3: LU done")
+    #DEBUG info("Time $(round(time() - t, 3)): Step 3: LU done")
 end
 
 function pidmap{T}(A::SubArray{T,2,DArray{T,2,Matrix{T}}})
@@ -226,7 +235,7 @@ function swaprows!{T}(A::SubArray{T,2,DArray{T,2,Matrix{T}}}, r1, r2)
     pidmap1 = pidmap(view(A, r1:r1, :))
     pidmap2 = pidmap(view(A, r2:r2, :))
 
-    for (i,((p1, (gr1, gc1, lr1, lc1, sr1, sc1)),
+    @sync for (i,((p1, (gr1, gc1, lr1, lc1, sr1, sc1)),
          (p2, (gr2, gc2, lr2, lc2, sr2, sc2)))) in enumerate(zip(pidmap1, pidmap2))
 
         #Need to look up which parts in pidmap2 align
@@ -235,10 +244,10 @@ function swaprows!{T}(A::SubArray{T,2,DArray{T,2,Matrix{T}}}, r1, r2)
             if p1 == p2 #Do all the work locally
                 # info("Local work")
                 @assert lc2 == lc2
-                @sync @spawnat p1 swaprows!(localpart(A), sr1, sr2)
+                @spawnat p1 swaprows!(localpart(A), sr1, sr2)
             else #copy from remote, swap, send
                 # info("Local work $p2 -> $p1")
-                @sync @spawnat p1 begin
+                @spawnat p1 begin
                      lA = localpart(A)
                      B = Array(view(A, sr1, sc1))
 
@@ -250,7 +259,7 @@ function swaprows!{T}(A::SubArray{T,2,DArray{T,2,Matrix{T}}}, r1, r2)
                 end
         end
     end
-    #info("swaprows! done")
+    #DEBUG info("swaprows! done")
 end
 
 function permuterows!{T}(A::SubArray{T,2,DArray{T,2,Matrix{T}}}, perm)
@@ -266,7 +275,7 @@ function calu!(A, k=64, b=64)
     m, n = size(A)
     piv = collect(1:m)
     for i = 1:ceil(Int, n/k)
-        #info("calu!: tslu! on [$((1+(i-1)*k):m), $((1+(i-1)*k):n)]")
+        #DEBUG info("calu!: tslu! on [$((1+(i-1)*k):m), $((1+(i-1)*k):n)]")
         tslu!(view(A, (1+(i-1)*k):m, (1+(i-1)*k):n), piv, k, b)
     end
     LinAlg.LU(A, piv, 0)
