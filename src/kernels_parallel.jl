@@ -3,7 +3,7 @@
 include("kernel_calu.jl")
 
 function hpl{T}(A::DArray{T,2}, b, k, l)
-    F = calu!(Array(A), k, l)
+    F = calu!(A, k, l)
     F \ b
 end
 
