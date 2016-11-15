@@ -60,7 +60,7 @@ for e in 6.5:0.5:8.0
     m = round(Int, 10^e)
     @printf("%16d | ", m)
     t = runstreamtriadp(m)
-    @printf("%15.6f | %15.9f\n", t, 1e-9*24*10*m/t)
+    @printf("%15.6f | %15.9f\n", t, 1e-9*24*m/t)
 end
 
 #Not implemented
