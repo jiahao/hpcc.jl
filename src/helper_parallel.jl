@@ -15,8 +15,14 @@ function runhplp(n, k, l)
     A′= Array(A)
 
     #Run
-    t = @elapsed x=hpl(A, b, k, l)
-
+    success = false
+    local t
+    while !success
+        try
+            t = @elapsed x=hpl(A, b, k, l)
+            success = true
+        end
+    end
     #Validate
     r = b - A′*x
     ϵ = eps()
