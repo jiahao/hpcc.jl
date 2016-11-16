@@ -9,21 +9,14 @@ end
 
 #Look up which processor owns index idx in DArray
 function procof{T}(A::DArray{T,1}, idx::Integer)
-    for (iproc, idxs) in enumerate(A.indexes)
-        localidx = 0
-        for ir in idxs, id in ir
-            localidx += 1
-            if idx==id
-                return A.pids[iproc], localidx
-            end
-        end
-    end
+    ipid = searchsortedlast(A.cuts[1], idx)
+    return A.pids[ipid], idx-A.cuts[1][ipid]+1
 end
 
 function updatearray!(A, w)
     Al = localpart(A)
-    for (i, r) in w
-	Al[i] $= r
+    @inbounds for (i, r) in w
+        Al[i] $= r
     end
 end
 
@@ -34,12 +27,12 @@ function randomupdate!{T<:Integer}(A::DArray{T,1}, nupdate)
         r = rand(T)
         index = r & (m-1) + 1
         p, i = procof(A, index)
-	work[p] = push!(get(work, p, Tuple{UInt64,UInt64}[]), (i, r))
+        work[p] = push!(get(work, p, Tuple{UInt64,UInt64}[]), (i, r))
     end
     @sync begin
-	for (p, w) in work
+    for (p, w) in work
             remotecall(updatearray!, p, A, w)
-	end
+    end
     end
 end
 
